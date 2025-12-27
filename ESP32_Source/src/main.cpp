@@ -27,6 +27,22 @@ const int ledPin = 2; // GPIO pin for the LED
 Adafruit_SSD1306 display(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, -1);
 
 
+#define TIMER_INTERRUPT_DEBUG       0
+#define ISR_SERVO_DEBUG             0
+// Select different ESP32 timer number (0-3) to avoid conflict
+#define USE_ESP32_TIMER_NO          3
+// To be included only in main(), .ino with setup() to avoid `Multiple Definitions` Linker Error
+#include "ESP32_ISR_Servo.h"
+
+// Published values for SG90 servos; adjust if needed
+#define MIN_MICROS      800  //544
+#define MAX_MICROS      2450
+#define SERVO_PIN      10
+#define SERVO_ANGLE_STOPPED    0
+#define SERVO_ANGLE_RUNNING    90
+int servoIndex  = -1;
+int servoDirection = 1; // 1: increasing angle, -1: decreasing angle
+
 ezButton button_up(3);
 ezButton button_down(4);
 ezButton button_mode(5);
@@ -43,7 +59,7 @@ int fTimerRunning = TIMERSTATUS_STOPPED;
 void upadteDisplay();
 
 void setup() {
-  //Serial.begin(115200);
+  Serial.begin(115200);
 
   // Initialize the LED pin as an output
   pinMode(ledPin, OUTPUT);
@@ -56,7 +72,12 @@ void setup() {
     for(;;);
   }
 
-  delay(1000);
+	ESP32_ISR_Servos.useTimer(USE_ESP32_TIMER_NO);
+	servoIndex = ESP32_ISR_Servos.setupServo(SERVO_PIN, MIN_MICROS, MAX_MICROS);
+
+
+
+
   display.clearDisplay();
 
   display.setTextSize(2);
@@ -70,6 +91,50 @@ void setup() {
   upadteDisplay();
 }
 
+void moveServo() {
+  static unsigned long lastMoveMillis = 0;
+  static int lastPosition = -1;
+  if (millis() - lastMoveMillis < 50) {
+    return;
+  }
+  if (servoIndex != -1) {
+    int position = ESP32_ISR_Servos.getPosition(servoIndex);
+    if ((lastPosition != -1) && (lastPosition != position)) {
+      return; // wait until last move is finished
+    }
+    Serial.println("Servo pos = " + String(position));
+    if (position == SERVO_ANGLE_RUNNING) {
+      servoDirection = -1;
+      Serial.println("Servo is running");
+      delay(500);
+    } else if (position == SERVO_ANGLE_STOPPED) {
+      servoDirection = 1;
+      Serial.println("Servo is stopped");
+      delay(500);
+    } 
+    lastPosition = position + servoDirection * 10;
+    ESP32_ISR_Servos.setPosition(servoIndex, lastPosition);
+    lastMoveMillis = millis();
+    // delay(1000);
+    // delay(1000);
+
+
+    // for (int position = 0; position <= 180; position++) 
+    // { 
+    //   // goes from 0 degrees to 180 degrees
+    //   // in steps of 1 degree
+
+    //   if (position %30 == 0)
+    //   {
+    //     Serial.println("Servo1 pos = " + String(position) + ", Servo2 pos = " + String(180 - position) );
+    //   }
+          
+    //   ESP32_ISR_Servos.setPosition(servoIndex1, position);
+    //   // waits 30ms for the servo to reach the position
+    //   delay(30);
+    // }
+  }
+}
 
 void upadteDisplay() {
   char buffer [32];
@@ -127,6 +192,8 @@ void loop() {
   button_down.loop();
   button_up.loop();
   button_mode.loop();
+
+  // moveServo();
 
   // put your main code here, to run repeatedly:
   // Serial.println("running loop");
