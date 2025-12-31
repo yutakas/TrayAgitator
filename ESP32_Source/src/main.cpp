@@ -65,13 +65,18 @@ int fTimerRunning = TIMERSTATUS_STOPPED;
 // Initialize with the 28BYJ-specific sequence: IN1, IN3, IN2, IN4
 AccelStepper stepper(AccelStepper::HALF4WIRE, PIN_13, PIN_11, PIN_12, PIN_10);
 
+void beep();
+void beep_short();
 void upadteDisplay();
 
 void setup() {
   Serial.begin(115200);
 
   // Initialize the LED pin as an output
-  pinMode(ledPin, OUTPUT);
+  // pinMode(ledPin, OUTPUT);
+
+  // buzzzer pin
+  pinMode(PIN_7, OUTPUT);
 
   Wire.begin();
   Wire.setPins(PIN_8, PIN_9);
@@ -99,8 +104,29 @@ void setup() {
   stepper.moveTo(0);
   delay(2000);
   // stepper.setSpeed(200);
+
+  // beep();
+  // delay(1000);
+  // beep_short();
 }
 
+void beep() {
+  for (int i = 0; i < 100; i++) {
+    digitalWrite(PIN_7, HIGH);
+    delay(3);
+    digitalWrite(PIN_7, LOW);  
+    delay(3);
+  }
+}
+
+void beep_short() {
+  for (int i = 0; i < 10; i++) {
+    digitalWrite(PIN_7, HIGH);
+    delay(1);
+    digitalWrite(PIN_7, LOW);  
+    delay(1);
+  }
+}
 
 void upadteDisplay() {
   char buffer [32];
@@ -206,14 +232,17 @@ void loop() {
       startMillis = millis();
       pausedMillis = -1;
       timeCurrentRemained = timerSetTime;
+      beep_short();
       // myServo.write(SERVO_ANGLE_RUNNING);
     } else if (fTimerRunning == TIMERSTATUS_RUNNING) {
       fTimerRunning = TIMERSTATUS_PAUSED;
       pausedMillis= millis();
       // myServo.write(SERVO_ANGLE_STOPPED);
+      beep_short();
     } else  if (fTimerRunning == TIMERSTATUS_PAUSED) {
       fTimerRunning = TIMERSTATUS_RUNNING;
       // myServo.write(SERVO_ANGLE_RUNNING);
+      beep_short();
     }
     fUpdateDisplay = true;
   }
@@ -229,18 +258,22 @@ void loop() {
         switch (currentSetMode) {
           case SETMODE_10SEC:
             timerSetTime += 10;
+            beep_short();
             break;
           case SETMODE_MINUTES:
             timerSetTime += 60;
+            beep_short();
             break;
           case SETMODE_HOURS:
             timerSetTime += 3600;
+            beep_short();
             break;            
           case SETMODE_STRENGTH4:
             currentStrengthLevel++;
             if (currentStrengthLevel > MAX_STRENGTH_LEVEL) {
               currentStrengthLevel = MAX_STRENGTH_LEVEL;
             }
+            beep_short();
             break;
         } 
         if (timerSetTime >= 3600 * 5) {
@@ -261,18 +294,22 @@ void loop() {
         switch (currentSetMode) {
           case SETMODE_10SEC:
             timerSetTime -= 10;
+            beep_short();
             break;
           case SETMODE_MINUTES:
             timerSetTime -= 60;
+            beep_short();
             break;
           case SETMODE_HOURS:
             timerSetTime -= 3600;
+            beep_short();
             break;
           case SETMODE_STRENGTH4:
             currentStrengthLevel--;
             if (currentStrengthLevel < 0) {
               currentStrengthLevel = 0;
             }
+            beep_short();
             break;
         }
         if (timerSetTime < 0) {
@@ -292,6 +329,7 @@ void loop() {
     if (currentSetMode > SETMODE_STRENGTH4) {
       currentSetMode = SETMODE_10SEC;
     }
+    beep_short();
   }
 
   if (fTimerRunning == TIMERSTATUS_RUNNING) {
@@ -305,6 +343,7 @@ void loop() {
       fTimerRunning = TIMERSTATUS_STOPPED;
       // myServo.write(SERVO_ANGLE_STOPPED);
       fUpdateDisplay = true;
+      beep();
     } else if (newTimeRemained != timeCurrentRemained) {
       timeCurrentRemained = newTimeRemained;
       fUpdateDisplay = true;
