@@ -33,8 +33,6 @@ int32_t timerSetTime = 0;
 #define MAX_STRENGTH_LEVEL 4
 int currentStrengthLevel = 0;
 
-// Define the LED pin
-const int ledPin = 2; // GPIO pin for the LED
 
 #define SCREEN_WIDTH 128 // OLED display width, in pixels
 #define SCREEN_HEIGHT 64 // OLED display height, in pixels
@@ -65,7 +63,9 @@ int fTimerRunning = TIMERSTATUS_STOPPED;
 // Initialize with the 28BYJ-specific sequence: IN1, IN3, IN2, IN4
 AccelStepper stepper(AccelStepper::HALF4WIRE, PIN_13, PIN_11, PIN_12, PIN_10);
 
-void beep();
+void beep_start();
+void beep_stop();
+void beep_run();
 void beep_short();
 void upadteDisplay();
 
@@ -106,9 +106,12 @@ void setup() {
   delay(2000);
   // stepper.setSpeed(200);
 
-  // beep();
+  // beep_start();
   // delay(1000);
-  beep_short();
+  // stop the beep
+  // beep_stop();
+  // delay(1000);
+  // beep_short();
 }
 
 bool fBeepRunning = false;
@@ -120,13 +123,17 @@ void beep_start() {
   fBeepRunning = true;
 }
 
+void beep_stop() {
+  ledcWriteTone(0, 0);
+  fBeepRunning = false;
+} 
+
 void beep_run() {
   if (fBeepRunning) {
     unsigned long currentMillis = millis();
     if (currentMillis - beepStartMillis >= beepDurationMillis) {
       // Stop the beep
-      ledcWriteTone(0, 0);
-      fBeepRunning = false;
+      beep_stop();
     }
   }
 }
@@ -208,26 +215,6 @@ void loop() {
     }
   }
   stepper.run();
-
-  // put your main code here, to run repeatedly:
-  // Serial.println("running loop");
-
-  // display.clearDisplay();
-  // display.setCursor(0, 10);
-  // display.println("ON");
-  // display.display(); 
-  // Turn the LED on
-  // digitalWrite(ledPin, HIGH);
-  // delay(1000); // Wait for 1 second
-
-  // display.clearDisplay();
-  // display.setCursor(0, 10);
-  // display.println("OFF");
-  // display.display(); 
-  // Turn the LED off
-  // digitalWrite(ledPin, LOW);
-  // delay(1000); // Wait for 1 second
-
 
   if(button_start.isPressed()) {
     Serial.println("The button_start is pressed");
