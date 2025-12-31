@@ -111,13 +111,24 @@ void setup() {
   beep_short();
 }
 
-void beep() {
-  // for (int i = 0; i < 100; i++) {
-  //   digitalWrite(PIN_7, HIGH);
-  //   delay(3);
-  //   digitalWrite(PIN_7, LOW);  
-  //   delay(3);
-  // }
+bool fBeepRunning = false;
+unsigned long beepStartMillis = 0;
+unsigned long beepDurationMillis = 2000;
+void beep_start() {
+  ledcWriteTone(0, 440 * 2); // Play 880 Hz tone
+  beepStartMillis = millis();
+  fBeepRunning = true;
+}
+
+void beep_run() {
+  if (fBeepRunning) {
+    unsigned long currentMillis = millis();
+    if (currentMillis - beepStartMillis >= beepDurationMillis) {
+      // Stop the beep
+      ledcWriteTone(0, 0);
+      fBeepRunning = false;
+    }
+  }
 }
 
 void beep_short() {
@@ -182,6 +193,7 @@ void loop() {
   button_down.loop();
   button_up.loop();
   button_mode.loop();
+  beep_run();
 
   int distanceToGo = stepper.distanceToGo();
   if (distanceToGo == 0) {
@@ -341,7 +353,7 @@ void loop() {
       fTimerRunning = TIMERSTATUS_STOPPED;
       // myServo.write(SERVO_ANGLE_STOPPED);
       fUpdateDisplay = true;
-      beep();
+      beep_start();
     } else if (newTimeRemained != timeCurrentRemained) {
       timeCurrentRemained = newTimeRemained;
       fUpdateDisplay = true;
