@@ -76,7 +76,8 @@ void setup() {
   // pinMode(ledPin, OUTPUT);
 
   // buzzzer pin
-  pinMode(PIN_7, OUTPUT);
+  ledcSetup(PIN_7, 2000, 8); // Channel 1, 2kHz, 8-bit resolution
+  ledcAttachPin(PIN_7, 0); // Attach the pin to a channel
 
   Wire.begin();
   Wire.setPins(PIN_8, PIN_9);
@@ -107,25 +108,22 @@ void setup() {
 
   // beep();
   // delay(1000);
-  // beep_short();
+  beep_short();
 }
 
 void beep() {
-  for (int i = 0; i < 100; i++) {
-    digitalWrite(PIN_7, HIGH);
-    delay(3);
-    digitalWrite(PIN_7, LOW);  
-    delay(3);
-  }
+  // for (int i = 0; i < 100; i++) {
+  //   digitalWrite(PIN_7, HIGH);
+  //   delay(3);
+  //   digitalWrite(PIN_7, LOW);  
+  //   delay(3);
+  // }
 }
 
 void beep_short() {
-  for (int i = 0; i < 10; i++) {
-    digitalWrite(PIN_7, HIGH);
-    delay(1);
-    digitalWrite(PIN_7, LOW);  
-    delay(1);
-  }
+  ledcWriteTone(0, 440 * 4);
+  delay(50);
+  ledcWriteTone(0, 0);
 }
 
 void upadteDisplay() {
