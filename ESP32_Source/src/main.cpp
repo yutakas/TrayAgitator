@@ -6,6 +6,22 @@
 
 #include <ezButton.h>
 
+#define PIN_1 1
+#define PIN_2 2
+#define PIN_3 3
+#define PIN_4 4
+#define PIN_5 5
+#define PIN_6 6
+#define PIN_7 7
+#define PIN_8 8
+#define PIN_9 9
+#define PIN_10 10 
+#define PIN_11 11
+#define PIN_12 12
+#define PIN_13 13
+#define PIN_14 14
+#define PIN_15 15
+
 #define SETMODE_STRENGTH4      4
 #define SETMODE_HOURS          3
 #define SETMODE_MINUTES        2
@@ -27,10 +43,10 @@ const int ledPin = 2; // GPIO pin for the LED
 Adafruit_SSD1306 display(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, -1);
 
 
-ezButton button_up(3);
-ezButton button_down(4);
-ezButton button_mode(5);
-ezButton button_start(6);
+ezButton button_up(PIN_3);
+ezButton button_down(PIN_4);
+ezButton button_mode(PIN_5);
+ezButton button_start(PIN_6);
 
 int timeCurrentRemained = 0;
 unsigned long startMillis = 0; 
@@ -40,16 +56,24 @@ unsigned long pausedMillis = 0;
 #define TIMERSTATUS_STOPPED 0
 int fTimerRunning = TIMERSTATUS_STOPPED;
 
+
+
+#include <AccelStepper.h>
+
+// Define some steppers and the pins the will use
+// Initialize with the 28BYJ-specific sequence: IN1, IN3, IN2, IN4
+AccelStepper stepper(AccelStepper::HALF4WIRE, PIN_13, PIN_11, PIN_12, PIN_10);
+
 void upadteDisplay();
 
 void setup() {
-  //Serial.begin(115200);
+  Serial.begin(115200);
 
   // Initialize the LED pin as an output
   pinMode(ledPin, OUTPUT);
 
   Wire.begin();
-  Wire.setPins(8,9);
+  Wire.setPins(PIN_8, PIN_9);
 
   if(!display.begin(SSD1306_SWITCHCAPVCC, 0x3C)) { // Address 0x3D for 128x64
     Serial.println(F("SSD1306 allocation failed"));
@@ -68,6 +92,12 @@ void setup() {
   delay(1000);
 
   upadteDisplay();
+
+  stepper.setMaxSpeed(2000.0);
+  stepper.setAcceleration(500.0);
+  stepper.moveTo(0);
+  delay(2000);
+  // stepper.setSpeed(200);
 }
 
 
@@ -127,6 +157,20 @@ void loop() {
   button_down.loop();
   button_up.loop();
   button_mode.loop();
+
+  int distanceToGo = stepper.distanceToGo();
+  if (distanceToGo == 0) {
+    // delay(1000);
+    int currentPos = stepper.currentPosition();
+    Serial.println("currentPos = " + String(currentPos));
+    Serial.println("distanceToGo == 0");
+    if (currentPos == 0) {
+      stepper.moveTo(2048);
+    } else {
+      stepper.moveTo(0);
+    }
+  }
+  stepper.run();
 
   // put your main code here, to run repeatedly:
   // Serial.println("running loop");
