@@ -57,28 +57,62 @@ int fTimerRunning = TIMERSTATUS_STOPPED;
 
 
 
-#include <AccelStepper.h>
-
-// Define some steppers and the pins the will use
-// Initialize with the 28BYJ-specific sequence: IN1, IN3, IN2, IN4
-AccelStepper stepper(AccelStepper::HALF4WIRE, PIN_13, PIN_11, PIN_12, PIN_10);
-
+// functins for BEEP
+#define LEDC_CHANNEL_FOR_BEEP 0
 void beep_start();
 void beep_stop();
 void beep_run();
 void beep_short();
 void upadteDisplay();
 
+
+
+#define STEPPER_STEP_PIN PIN_10
+#define STEPPER_DIRECT_PIN PIN_11
+#define STEPPER_ENABLE_PIN PIN_12
+
+int pulseWidthMicros = 20;  // microseconds
+int millisbetweenSteps = 1;
+
+//--- test direct control of stepper motor ---
+void testStepperDirectControl() {
+  Serial.println("Start testStepperDirectControl");
+  int numberOfSteps = 1000;
+
+  digitalWrite(STEPPER_DIRECT_PIN, HIGH);
+  digitalWrite(STEPPER_ENABLE_PIN, HIGH); 
+
+  for(int n = 0; n < numberOfSteps; n++) {
+    digitalWrite(STEPPER_STEP_PIN, HIGH);
+    delayMicroseconds(pulseWidthMicros); // this line is probably unnecessary
+    digitalWrite(STEPPER_STEP_PIN, LOW);
+    
+    delay(millisbetweenSteps);
+    
+    // digitalWrite(ledPin, !digitalRead(ledPin));
+  }
+  // digitalWrite(stepPin, HIGH);
+  // delay(2000);
+  digitalWrite(STEPPER_ENABLE_PIN, LOW); 
+  Serial.println("End testStepperDirectControl");
+}
+
+
+//--- SETUP and LOOP ---
+// the setup function runs once when you press reset or power the board
 void setup() {
   Serial.begin(115200);
 
   // Initialize the LED pin as an output
   // pinMode(ledPin, OUTPUT);
+  pinMode(STEPPER_ENABLE_PIN, OUTPUT);
+  digitalWrite(STEPPER_ENABLE_PIN, LOW); 
 
   // buzzzer pin
-  ledcSetup(PIN_7, 2000, 8); // Channel 1, 2kHz, 8-bit resolution
-  ledcAttachPin(PIN_7, 0); // Attach the pin to a channel
+  ledcSetup(LEDC_CHANNEL_FOR_BEEP, 2000, 8); // Channel 1, 2kHz, 8-bit resolution
+  ledcAttachPin(PIN_7, LEDC_CHANNEL_FOR_BEEP); // Attach the pin to a channel
 
+  // I2C setup
   Wire.begin();
   Wire.setPins(PIN_8, PIN_9);
 
@@ -100,31 +134,26 @@ void setup() {
 
   upadteDisplay();
 
-  stepper.setMaxSpeed(2000.0);
-  stepper.setAcceleration(500.0);
-  stepper.moveTo(0);
-  delay(2000);
-  // stepper.setSpeed(200);
+  pinMode(STEPPER_DIRECT_PIN, OUTPUT);
+  pinMode(STEPPER_STEP_PIN, OUTPUT);
 
-  // beep_start();
-  // delay(1000);
-  // stop the beep
-  // beep_stop();
-  // delay(1000);
-  // beep_short();
+  // testStepperDirectControl();
 }
 
+
+
+//--- BEEP functions ---
 bool fBeepRunning = false;
 unsigned long beepStartMillis = 0;
-unsigned long beepDurationMillis = 2000;
+unsigned long beepDurationMillis = 500; //2000;
 void beep_start() {
-  ledcWriteTone(0, 440 * 2); // Play 880 Hz tone
+  ledcWriteTone(LEDC_CHANNEL_FOR_BEEP, 440 * 2); // Play 880 Hz tone
   beepStartMillis = millis();
   fBeepRunning = true;
 }
 
 void beep_stop() {
-  ledcWriteTone(0, 0);
+  ledcWriteTone(LEDC_CHANNEL_FOR_BEEP, 0);
   fBeepRunning = false;
 } 
 
@@ -139,11 +168,12 @@ void beep_run() {
 }
 
 void beep_short() {
-  ledcWriteTone(0, 440 * 4);
+  ledcWriteTone(LEDC_CHANNEL_FOR_BEEP, 440 * 4);
   delay(50);
-  ledcWriteTone(0, 0);
+  ledcWriteTone(LEDC_CHANNEL_FOR_BEEP, 0);
 }
 
+//--- Update Display ---
 void upadteDisplay() {
   char buffer [32];
   display.clearDisplay();
@@ -192,6 +222,35 @@ void upadteDisplay() {
   display.display();  
 }
 
+bool fStepperRunning = false;
+unsigned long stepperLastRunMillis = 0;
+
+void stepper_start() { 
+  stepperLastRunMillis = millis();  
+  fStepperRunning = true;
+  digitalWrite(STEPPER_DIRECT_PIN, LOW);
+  digitalWrite(STEPPER_ENABLE_PIN, HIGH);
+}
+
+void stepper_stop() {
+  fStepperRunning = false;
+  digitalWrite(STEPPER_ENABLE_PIN, LOW); 
+} 
+
+void stepper_run() {
+  if (fStepperRunning) {
+    unsigned long currentMillis = millis();
+    if (currentMillis - stepperLastRunMillis >= millisbetweenSteps + (MAX_STRENGTH_LEVEL - currentStrengthLevel) * 1) {
+      stepperLastRunMillis = currentMillis;
+      // Make a step
+      digitalWrite(STEPPER_STEP_PIN, HIGH);
+      delayMicroseconds(pulseWidthMicros); // this line is probably unnecessary
+      digitalWrite(STEPPER_STEP_PIN, LOW);
+    }
+  }
+} 
+
+// the loop function runs over and over again forever
 void loop() {
   bool fUpdateDisplay = false;
   unsigned long currentMillis = millis();
@@ -202,19 +261,8 @@ void loop() {
   button_mode.loop();
   beep_run();
 
-  int distanceToGo = stepper.distanceToGo();
-  if (distanceToGo == 0) {
-    // delay(1000);
-    int currentPos = stepper.currentPosition();
-    Serial.println("currentPos = " + String(currentPos));
-    Serial.println("distanceToGo == 0");
-    if (currentPos == 0) {
-      stepper.moveTo(2048);
-    } else {
-      stepper.moveTo(0);
-    }
-  }
-  stepper.run();
+
+  stepper_run();
 
   if(button_start.isPressed()) {
     Serial.println("The button_start is pressed");
@@ -225,20 +273,22 @@ void loop() {
     Serial.println("The button_start is released");
 
     if (fTimerRunning == TIMERSTATUS_STOPPED) {
-      fTimerRunning = TIMERSTATUS_RUNNING;
-      startMillis = millis();
-      pausedMillis = -1;
-      timeCurrentRemained = timerSetTime;
-      beep_short();
-      // myServo.write(SERVO_ANGLE_RUNNING);
+      if (timerSetTime > 0) {
+        fTimerRunning = TIMERSTATUS_RUNNING;
+        startMillis = millis();
+        pausedMillis = -1;
+        timeCurrentRemained = timerSetTime;
+        beep_short();
+        stepper_start();
+      }
     } else if (fTimerRunning == TIMERSTATUS_RUNNING) {
       fTimerRunning = TIMERSTATUS_PAUSED;
       pausedMillis= millis();
-      // myServo.write(SERVO_ANGLE_STOPPED);
+      stepper_stop();
       beep_short();
     } else  if (fTimerRunning == TIMERSTATUS_PAUSED) {
       fTimerRunning = TIMERSTATUS_RUNNING;
-      // myServo.write(SERVO_ANGLE_RUNNING);
+      stepper_start();
       beep_short();
     }
     fUpdateDisplay = true;
@@ -338,7 +388,7 @@ void loop() {
     if (newTimeRemained == 0) {
       timeCurrentRemained = newTimeRemained;
       fTimerRunning = TIMERSTATUS_STOPPED;
-      // myServo.write(SERVO_ANGLE_STOPPED);
+      stepper_stop();
       fUpdateDisplay = true;
       beep_start();
     } else if (newTimeRemained != timeCurrentRemained) {
