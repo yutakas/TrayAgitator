@@ -5,6 +5,9 @@
 #include <Adafruit_SSD1306.h>
 
 #include <ezButton.h>
+#include <Preferences.h>
+
+Preferences prefs;
 
 #define PIN_1 1
 #define PIN_2 2
@@ -72,7 +75,7 @@ void upadteDisplay();
 #define STEPPER_ENABLE_PIN PIN_12
 
 int pulseWidthMicros = 20;  // microseconds
-int millisbetweenSteps = 1;
+int stepIntervalMicros = 1000; // base interval at max strength (1ms = 1000µs)
 
 //--- test direct control of stepper motor ---
 void testStepperDirectControl() {
@@ -87,7 +90,7 @@ void testStepperDirectControl() {
     delayMicroseconds(pulseWidthMicros); // this line is probably unnecessary
     digitalWrite(STEPPER_STEP_PIN, LOW);
     
-    delay(millisbetweenSteps);
+    delayMicroseconds(stepIntervalMicros);
     
     // digitalWrite(ledPin, !digitalRead(ledPin));
   }
@@ -102,6 +105,12 @@ void testStepperDirectControl() {
 // the setup function runs once when you press reset or power the board
 void setup() {
   Serial.begin(115200);
+
+  // Restore saved settings from NVS
+  prefs.begin("agitator", true); // read-only
+  timerSetTime = prefs.getInt("timerSetTime", 0);
+  currentStrengthLevel = prefs.getInt("strengthLevel", 0);
+  prefs.end();
 
   // Initialize the LED pin as an output
   // pinMode(ledPin, OUTPUT);
@@ -141,6 +150,14 @@ void setup() {
 }
 
 
+
+//--- Persist settings to NVS ---
+void savePrefs() {
+  prefs.begin("agitator", false); // read-write
+  prefs.putInt("timerSetTime", timerSetTime);
+  prefs.putInt("strengthLevel", currentStrengthLevel);
+  prefs.end();
+}
 
 //--- BEEP functions ---
 bool fBeepRunning = false;
@@ -223,10 +240,10 @@ void upadteDisplay() {
 }
 
 bool fStepperRunning = false;
-unsigned long stepperLastRunMillis = 0;
+unsigned long stepperLastRunMicros = 0;
 
-void stepper_start() { 
-  stepperLastRunMillis = millis();  
+void stepper_start() {
+  stepperLastRunMicros = micros();
   fStepperRunning = true;
   digitalWrite(STEPPER_DIRECT_PIN, LOW);
   digitalWrite(STEPPER_ENABLE_PIN, HIGH);
@@ -234,17 +251,18 @@ void stepper_start() {
 
 void stepper_stop() {
   fStepperRunning = false;
-  digitalWrite(STEPPER_ENABLE_PIN, LOW); 
-} 
+  digitalWrite(STEPPER_ENABLE_PIN, LOW);
+}
 
 void stepper_run() {
   if (fStepperRunning) {
-    unsigned long currentMillis = millis();
-    if (currentMillis - stepperLastRunMillis >= millisbetweenSteps + (MAX_STRENGTH_LEVEL - currentStrengthLevel) * 1) {
-      stepperLastRunMillis = currentMillis;
+    unsigned long currentMicros = micros();
+    unsigned long interval = stepIntervalMicros + (MAX_STRENGTH_LEVEL - currentStrengthLevel) * 1000UL;
+    if (currentMicros - stepperLastRunMicros >= interval) {
+      stepperLastRunMicros = currentMicros;
       // Make a step
       digitalWrite(STEPPER_STEP_PIN, HIGH);
-      delayMicroseconds(pulseWidthMicros); // this line is probably unnecessary
+      delayMicroseconds(pulseWidthMicros);
       digitalWrite(STEPPER_STEP_PIN, LOW);
     }
   }
@@ -325,11 +343,12 @@ void loop() {
         } 
         if (timerSetTime >= 3600 * 5) {
           timerSetTime = 3600 * 5;
-        }             
+        }
+        savePrefs();
         fUpdateDisplay = true;
     }
   }
-  
+
   if(button_down.isPressed()) {
     Serial.println("The button_down is pressed");
     fUpdateDisplay = true;
@@ -361,7 +380,8 @@ void loop() {
         }
         if (timerSetTime < 0) {
           timerSetTime = 0;
-        }      
+        }
+        savePrefs();
         fUpdateDisplay = true;
     }
   }
