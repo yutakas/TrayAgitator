@@ -257,7 +257,7 @@ void stepper_stop() {
 void stepper_run() {
   if (fStepperRunning) {
     unsigned long currentMicros = micros();
-    unsigned long interval = stepIntervalMicros + (MAX_STRENGTH_LEVEL - currentStrengthLevel) * 1000UL;
+    unsigned long interval = stepIntervalMicros + (MAX_STRENGTH_LEVEL - currentStrengthLevel) * 200UL;
     if (currentMicros - stepperLastRunMicros >= interval) {
       stepperLastRunMicros = currentMicros;
       // Make a step
