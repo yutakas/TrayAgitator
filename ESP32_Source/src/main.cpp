@@ -247,9 +247,16 @@ void upadteDisplay() {
 
 bool fStepperRunning = false;
 unsigned long stepperLastRunMicros = 0;
+unsigned long stepperCycleStartMillis = 0;
+bool stepperInRestPhase = false;
+
+#define STEPPER_RUN_MS  2000
+#define STEPPER_REST_MS 8000
 
 void stepper_start() {
   stepperLastRunMicros = micros();
+  stepperCycleStartMillis = millis();
+  stepperInRestPhase = false;
   fStepperRunning = true;
   digitalWrite(STEPPER_DIRECT_PIN, LOW);
   digitalWrite(STEPPER_ENABLE_PIN, HIGH);
@@ -257,19 +264,39 @@ void stepper_start() {
 
 void stepper_stop() {
   fStepperRunning = false;
+  stepperInRestPhase = false;
   digitalWrite(STEPPER_ENABLE_PIN, LOW);
 }
 
 void stepper_run() {
   if (fStepperRunning) {
-    unsigned long currentMicros = micros();
-    unsigned long interval = stepIntervalMicros + (MAX_STRENGTH_LEVEL - currentStrengthLevel) * 200UL;
-    if (currentMicros - stepperLastRunMicros >= interval) {
-      stepperLastRunMicros = currentMicros;
-      // Make a step
-      digitalWrite(STEPPER_STEP_PIN, HIGH);
-      delayMicroseconds(pulseWidthMicros);
-      digitalWrite(STEPPER_STEP_PIN, LOW);
+    unsigned long elapsed = millis() - stepperCycleStartMillis;
+
+    if (stepperInRestPhase) {
+      if (elapsed >= STEPPER_REST_MS) {
+        // Rest phase over, start rotating
+        stepperInRestPhase = false;
+        stepperCycleStartMillis = millis();
+        stepperLastRunMicros = micros();
+        digitalWrite(STEPPER_ENABLE_PIN, HIGH);
+      }
+    } else {
+      if (elapsed >= STEPPER_RUN_MS) {
+        // Run phase over, start resting
+        stepperInRestPhase = true;
+        stepperCycleStartMillis = millis();
+        digitalWrite(STEPPER_ENABLE_PIN, LOW);
+      } else {
+        // Stepping
+        unsigned long currentMicros = micros();
+        unsigned long interval = stepIntervalMicros + (MAX_STRENGTH_LEVEL - currentStrengthLevel) * 200UL;
+        if (currentMicros - stepperLastRunMicros >= interval) {
+          stepperLastRunMicros = currentMicros;
+          digitalWrite(STEPPER_STEP_PIN, HIGH);
+          delayMicroseconds(pulseWidthMicros);
+          digitalWrite(STEPPER_STEP_PIN, LOW);
+        }
+      }
     }
   }
 } 
