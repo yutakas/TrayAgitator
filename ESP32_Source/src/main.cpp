@@ -56,6 +56,7 @@ unsigned long pausedMillis = 0;
 #define TIMERSTATUS_PAUSED 1
 #define TIMERSTATUS_STOPPED 0
 int fTimerRunning = TIMERSTATUS_STOPPED;
+bool cancelGestureHandled = false;
 
 
 
@@ -142,6 +143,11 @@ void setup() {
   delay(1000);
 
   upadteDisplay();
+
+  button_up.setDebounceTime(50);
+  button_down.setDebounceTime(50);
+  button_mode.setDebounceTime(50);
+  button_start.setDebounceTime(50);
 
   pinMode(STEPPER_DIRECT_PIN, OUTPUT);
   pinMode(STEPPER_STEP_PIN, OUTPUT);
@@ -282,13 +288,41 @@ void loop() {
 
   stepper_run();
 
-  if(button_start.isPressed()) {
-    Serial.println("The button_start is pressed");
-    fUpdateDisplay = true;
+  // Track physical button hold state using edge events
+  // PIN_5 (mode) rests LOW: isReleased()=physical press, isPressed()=physical release
+  // PIN_6 (start) rests HIGH: isPressed()=physical press, isReleased()=physical release
+  static bool startHeld = false;
+  static bool modeHeld = false;
+
+  if (button_start.isPressed()) { startHeld = true; Serial.printf("[BTN] start HELD (modeHeld=%d cancelFlag=%d timer=%d)\n", modeHeld, cancelGestureHandled, fTimerRunning); fUpdateDisplay = true; }
+  if (button_start.isReleased()) { startHeld = false; Serial.printf("[BTN] start FREE (modeHeld=%d cancelFlag=%d timer=%d)\n", modeHeld, cancelGestureHandled, fTimerRunning); }
+  if (button_mode.isReleased()) { modeHeld = true; Serial.printf("[BTN] mode  HELD (startHeld=%d cancelFlag=%d timer=%d)\n", startHeld, cancelGestureHandled, fTimerRunning); }
+  if (button_mode.isPressed()) { modeHeld = false; Serial.printf("[BTN] mode  FREE (startHeld=%d cancelFlag=%d timer=%d)\n", startHeld, cancelGestureHandled, fTimerRunning); }
+  if (button_up.isReleased()) { Serial.println("[BTN] up    HELD"); fUpdateDisplay = true; }
+  if (button_up.isPressed()) { Serial.println("[BTN] up    FREE"); }
+  if (button_down.isReleased()) { Serial.println("[BTN] down  HELD"); fUpdateDisplay = true; }
+  if (button_down.isPressed()) { Serial.println("[BTN] down  FREE"); }
+
+  // Cancel timer: both mode + start physically held simultaneously
+  if (startHeld && modeHeld) {
+    if (!cancelGestureHandled && fTimerRunning != TIMERSTATUS_STOPPED) {
+      Serial.println("[CANCEL] fired");
+      fTimerRunning = TIMERSTATUS_STOPPED;
+      stepper_stop();
+      beep_short();
+      fUpdateDisplay = true;
+      cancelGestureHandled = true;
+    }
+  }
+  // Reset cancel flag once both buttons are physically released and no pending events
+  if (cancelGestureHandled && !startHeld && !modeHeld
+      && !button_start.isReleased() && !button_mode.isPressed()) {
+    Serial.println("[CANCEL] flag reset");
+    cancelGestureHandled = false;
   }
 
-  if(button_start.isReleased()) {
-    Serial.println("The button_start is released");
+  if(button_start.isReleased() && !cancelGestureHandled) {
+    Serial.printf("[ACTION] start toggle (timer=%d)\n", fTimerRunning);
 
     if (fTimerRunning == TIMERSTATUS_STOPPED) {
       if (timerSetTime > 0) {
@@ -390,7 +424,7 @@ void loop() {
     fUpdateDisplay = true;
   }
 
-  if(button_mode.isReleased()) {
+  if(button_mode.isReleased() && !cancelGestureHandled) {
     Serial.println("The button_mode is released");
     currentSetMode++;
     if (currentSetMode > SETMODE_STRENGTH4) {
