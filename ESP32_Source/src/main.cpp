@@ -1,4 +1,5 @@
 #include <Arduino.h>
+#include <WiFi.h>
 
 #include <Wire.h>
 #include <Adafruit_GFX.h>
@@ -112,6 +113,8 @@ void setup() {
   timerSetTime = prefs.getInt("timerSetTime", 0);
   currentStrengthLevel = prefs.getInt("strengthLevel", 0);
   prefs.end();
+
+  WiFi.mode(WIFI_OFF);
 
   // Initialize the LED pin as an output
   // pinMode(ledPin, OUTPUT);
