@@ -1,0 +1,140 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1240" height="1000" viewBox="0 0 1240 1000" font-family="Helvetica, Arial, sans-serif">
+  <defs>
+    <marker id="dot" markerWidth="8" markerHeight="8" refX="4" refY="4">
+      <circle cx="4" cy="4" r="3" fill="#333"/>
+    </marker>
+    <style>
+      .box   { fill:#ffffff; stroke-width:2.5; rx:10; }
+      .title { font-size:17px; font-weight:bold; }
+      .pin   { font-family:Menlo,Consolas,monospace; font-size:13px; fill:#222; }
+      .lbl   { font-family:Menlo,Consolas,monospace; font-size:12.5px; font-weight:bold; }
+      .wire  { stroke-width:2.5; fill:none; }
+      .note  { font-size:13px; fill:#222; }
+    </style>
+  </defs>
+
+  <!-- Title -->
+  <text x="620" y="40" text-anchor="middle" font-size="27" font-weight="bold" fill="#111">TrayAgitator — Wiring Diagram</text>
+  <text x="620" y="66" text-anchor="middle" font-size="14" fill="#555">ESP32-S3 Zero (Waveshare) · A4988 stepper driver · SSD1306 OLED · passive buzzer · 4 buttons</text>
+
+  <!-- ================= WIRES (drawn first, under boxes) ================= -->
+  <!-- Buttons -> MCU -->
+  <path class="wire" stroke="#1d4ed8" d="M300,200 L510,420"/>
+  <!-- OLED -> MCU (I2C) -->
+  <path class="wire" stroke="#7c3aed" d="M300,650 L510,540"/>
+  <!-- Buzzer -> MCU -->
+  <path class="wire" stroke="#1d4ed8" d="M940,175 L730,400"/>
+  <!-- A4988 logic -> MCU -->
+  <path class="wire" stroke="#1d4ed8" d="M900,420 L730,470"/>
+  <!-- A4988 -> Stepper coils -->
+  <path class="wire" stroke="#ea580c" d="M1055,560 L1080,610"/>
+  <!-- Motor PSU -> A4988 VMOT -->
+  <path class="wire" stroke="#7f1d1d" d="M710,745 L900,520"/>
+  <!-- Motor PSU GND -> MCU common GND -->
+  <path class="wire" stroke="#333" stroke-dasharray="6 5" d="M590,700 L620,600"/>
+
+  <!-- wire labels -->
+  <text class="lbl" x="372" y="300" fill="#1d4ed8">GPIO3·4·5·6</text>
+  <text class="lbl" x="372" y="316" fill="#333">+ GND</text>
+  <text class="lbl" x="330" y="582" fill="#7c3aed">SDA=8 · SCL=9</text>
+  <text class="lbl" x="330" y="598" fill="#333">+ 3V3 / GND</text>
+  <text class="lbl" x="800" y="270" fill="#1d4ed8">GPIO7 + GND</text>
+  <text class="lbl" x="742" y="430" fill="#1d4ed8">STEP10·DIR11·EN12</text>
+  <text class="lbl" x="742" y="446" fill="#333">+ 3V3 / GND</text>
+  <text class="lbl" x="980" y="592" fill="#ea580c">Coil A 1A/1B · Coil B 2A/2B</text>
+  <text class="lbl" x="700" y="635" fill="#7f1d1d">VMOT(+) / GND(−)</text>
+  <text class="lbl" x="455" y="655" fill="#333">common GND</text>
+
+  <!-- ================= BLOCKS ================= -->
+  <!-- MCU -->
+  <rect class="box" x="510" y="360" width="220" height="240" stroke="#111"/>
+  <text class="title" x="620" y="388" text-anchor="middle">ESP32-S3 Zero</text>
+  <line x1="525" y1="398" x2="715" y2="398" stroke="#ddd"/>
+  <text class="pin" x="525" y="420">USB-C  → 5V power</text>
+  <text class="pin" x="525" y="440">3V3 / GND rails</text>
+  <text class="pin" x="525" y="466">GPIO3–6  buttons</text>
+  <text class="pin" x="525" y="486">GPIO7    buzzer</text>
+  <text class="pin" x="525" y="506">GPIO8/9  I²C OLED</text>
+  <text class="pin" x="525" y="526">GPIO10   STEP</text>
+  <text class="pin" x="525" y="546">GPIO11   DIR</text>
+  <text class="pin" x="525" y="566">GPIO12   EN</text>
+  <text class="pin" x="525" y="588" fill="#777">firmware: USB-CDC serial</text>
+
+  <!-- Buttons -->
+  <rect class="box" x="40" y="110" width="260" height="190" stroke="#1d4ed8"/>
+  <text class="title" x="170" y="138" text-anchor="middle" fill="#1d4ed8">Push Buttons ×4</text>
+  <line x1="55" y1="148" x2="285" y2="148" stroke="#ddd"/>
+  <text class="pin" x="55" y="172">UP    → GPIO3</text>
+  <text class="pin" x="55" y="194">DOWN  → GPIO4</text>
+  <text class="pin" x="55" y="216">MODE  → GPIO5</text>
+  <text class="pin" x="55" y="238">START → GPIO6</text>
+  <text class="pin" x="55" y="266" fill="#555">other leg → GND</text>
+  <text class="pin" x="55" y="286" fill="#555">INPUT_PULLUP (debounce 50ms)</text>
+
+  <!-- OLED -->
+  <rect class="box" x="40" y="560" width="260" height="180" stroke="#7c3aed"/>
+  <text class="title" x="170" y="588" text-anchor="middle" fill="#7c3aed">OLED SSD1306</text>
+  <line x1="55" y1="598" x2="285" y2="598" stroke="#ddd"/>
+  <text class="pin" x="55" y="622">128×64 · I²C @ 0x3C</text>
+  <text class="pin" x="55" y="650">VCC → 3V3</text>
+  <text class="pin" x="55" y="672">GND → GND</text>
+  <text class="pin" x="55" y="694">SDA → GPIO8</text>
+  <text class="pin" x="55" y="716">SCL → GPIO9</text>
+
+  <!-- Buzzer -->
+  <rect class="box" x="940" y="110" width="270" height="130" stroke="#1d4ed8"/>
+  <text class="title" x="1075" y="138" text-anchor="middle" fill="#1d4ed8">Passive Buzzer</text>
+  <line x1="955" y1="148" x2="1195" y2="148" stroke="#ddd"/>
+  <text class="pin" x="955" y="172">(+) → GPIO7</text>
+  <text class="pin" x="955" y="194">(−) → GND</text>
+  <text class="pin" x="955" y="222" fill="#555">driven by LEDC PWM tone (2 kHz)</text>
+
+  <!-- A4988 -->
+  <rect class="box" x="900" y="300" width="310" height="260" stroke="#ea580c"/>
+  <text class="title" x="1055" y="328" text-anchor="middle" fill="#ea580c">A4988 Stepper Driver</text>
+  <line x1="915" y1="338" x2="1195" y2="338" stroke="#ddd"/>
+  <text class="pin" x="915" y="360">VDD → 3V3      GND → GND</text>
+  <text class="pin" x="915" y="382">STEP → GPIO10</text>
+  <text class="pin" x="915" y="404">DIR  → GPIO11</text>
+  <text class="pin" x="915" y="426">EN   → GPIO12   (see note 2)</text>
+  <text class="pin" x="915" y="448">RESET ── SLEEP  (tie together)</text>
+  <text class="pin" x="915" y="470">MS1/MS2/MS3 → microstep select</text>
+  <text class="pin" x="915" y="498">VMOT → +V motor   GND → PSU−</text>
+  <text class="pin" x="915" y="520">100 µF cap across VMOT–GND</text>
+  <text class="pin" x="915" y="542">1A 1B 2A 2B → motor coils</text>
+
+  <!-- Stepper motor -->
+  <rect class="box" x="950" y="610" width="260" height="150" stroke="#ea580c"/>
+  <text class="title" x="1080" y="638" text-anchor="middle" fill="#ea580c">Bipolar Stepper</text>
+  <line x1="965" y1="648" x2="1195" y2="648" stroke="#ddd"/>
+  <text class="pin" x="965" y="672">NEMA-style, 4-wire</text>
+  <text class="pin" x="965" y="700">Coil A → 1A / 1B</text>
+  <text class="pin" x="965" y="722">Coil B → 2A / 2B</text>
+  <text class="pin" x="965" y="748" fill="#555">runs 2 s on / 8 s off cycle</text>
+
+  <!-- Motor PSU -->
+  <rect class="box" x="470" y="700" width="240" height="120" stroke="#7f1d1d"/>
+  <text class="title" x="590" y="728" text-anchor="middle" fill="#7f1d1d">Motor Supply</text>
+  <line x1="485" y1="738" x2="695" y2="738" stroke="#ddd"/>
+  <text class="pin" x="485" y="762">8–35 V (e.g. 12 V)</text>
+  <text class="pin" x="485" y="784">(+) → A4988 VMOT</text>
+  <text class="pin" x="485" y="806">(−) → common GND</text>
+
+  <!-- ================= LEGEND ================= -->
+  <rect x="350" y="110" width="300" height="150" rx="8" fill="#fafafa" stroke="#ccc"/>
+  <text x="500" y="134" text-anchor="middle" font-size="14" font-weight="bold" fill="#444">Legend</text>
+  <line x1="368" y1="156" x2="398" y2="156" class="wire" stroke="#1d4ed8"/><text class="note" x="406" y="160">GPIO signal</text>
+  <line x1="368" y1="180" x2="398" y2="180" class="wire" stroke="#7c3aed"/><text class="note" x="406" y="184">I²C bus</text>
+  <line x1="368" y1="204" x2="398" y2="204" class="wire" stroke="#ea580c"/><text class="note" x="406" y="208">stepper motor coils</text>
+  <line x1="368" y1="228" x2="398" y2="228" class="wire" stroke="#7f1d1d"/><text class="note" x="406" y="232">motor power (VMOT)</text>
+  <line x1="368" y1="252" x2="398" y2="252" class="wire" stroke="#333" stroke-dasharray="6 5"/><text class="note" x="406" y="256">common ground</text>
+
+  <!-- ================= NOTES ================= -->
+  <rect x="40" y="845" width="1170" height="140" rx="8" fill="#fffdf5" stroke="#e0c97f"/>
+  <text x="58" y="870" font-size="15" font-weight="bold" fill="#8a6d1b">Notes</text>
+  <text class="note" x="58" y="894">1.  All grounds must be common: ESP32 GND, A4988 logic GND, motor-supply (−), OLED, buzzer, and button return all tie together.</text>
+  <text class="note" x="58" y="916">2.  A4988 EN is active-LOW on the chip (LOW = enabled). Firmware drives EN HIGH to run and LOW to idle — verify your physical EN wiring/logic matches.</text>
+  <text class="note" x="58" y="938">3.  Tie A4988 RESET to SLEEP so the driver stays awake; set MS1/MS2/MS3 for the microstep mode you want (all low = full step).</text>
+  <text class="note" x="58" y="960">4.  Power the ESP32-S3 Zero from USB-C (5 V); take 3V3 from its 3V3 pad for OLED + A4988 logic. Motor power (VMOT) comes from the separate supply.</text>
+  <text class="note" x="58" y="982" fill="#8a6d1b">5.  Firmware comment notes the MODE button idles LOW while the others idle HIGH — confirm that switch's wiring/normally-open vs normally-closed state.</text>
+</svg>
