@@ -7,6 +7,7 @@
 
 #include <ezButton.h>
 #include <Preferences.h>
+#include <esp_system.h>
 
 Preferences prefs;
 
@@ -69,6 +70,7 @@ void beep_stop();
 void beep_run();
 void beep_short();
 void upadteDisplay();
+void setSessionActiveFlag(bool active);
 
 
 
@@ -103,6 +105,24 @@ void testStepperDirectControl() {
 }
 
 
+// Human-readable last-reset cause. Diagnoses standalone reboots (no USB needed):
+// BROWNOUT = power sag, PANIC = firmware crash, *WDT = a hang/lockup.
+const char* resetReasonStr(esp_reset_reason_t r) {
+  switch (r) {
+    case ESP_RST_POWERON:   return "Power-on";
+    case ESP_RST_EXT:       return "Ext reset";
+    case ESP_RST_SW:        return "SW reset";
+    case ESP_RST_PANIC:     return "PANIC/crash";
+    case ESP_RST_INT_WDT:   return "Int WDT";
+    case ESP_RST_TASK_WDT:  return "Task WDT";
+    case ESP_RST_WDT:       return "Other WDT";
+    case ESP_RST_DEEPSLEEP: return "Deep sleep";
+    case ESP_RST_BROWNOUT:  return "BROWNOUT";
+    case ESP_RST_SDIO:      return "SDIO";
+    default:                return "Unknown";
+  }
+}
+
 //--- SETUP and LOOP ---
 // the setup function runs once when you press reset or power the board
 void setup() {
@@ -112,6 +132,7 @@ void setup() {
   prefs.begin("agitator", true); // read-only
   timerSetTime = prefs.getInt("timerSetTime", 0);
   currentStrengthLevel = prefs.getInt("strengthLevel", 0);
+  int sessionWasActive = prefs.getInt("sessionOn", 0); // was a run in progress at last reset?
   prefs.end();
 
   WiFi.mode(WIFI_OFF);
@@ -135,22 +156,55 @@ void setup() {
   }
 
   delay(1000);
+
+  // Report why the board last reset so standalone reboots can be diagnosed
+  // without a USB/serial connection, plus whether a run was active at the time.
+  esp_reset_reason_t resetReason = esp_reset_reason();
+  Serial.printf("Last reset reason: %d (%s), session active: %d\n",
+                resetReason, resetReasonStr(resetReason), sessionWasActive);
+
+  // No run is in progress immediately after boot, so clear the flag now; it only
+  // returns to 1 once a real session starts. Keeps the next reading accurate.
+  setSessionActiveFlag(false);
+
   display.clearDisplay();
-
-  display.setTextSize(2);
   display.setTextColor(WHITE);
-  display.setCursor(0, 10);
-  // Display static text
-  display.println("Hello, world!!!!");
-  display.display(); 
-  delay(1000);
-
-  upadteDisplay();
+  display.setTextSize(1);
+  display.setCursor(0, 0);
+  display.println("Last reset:");
+  display.setTextSize(2);
+  display.setCursor(0, 14);
+  display.println(resetReasonStr(resetReason));
+  display.setTextSize(1);
+  display.setCursor(0, 38);
+  display.print("When: ");
+  display.println(sessionWasActive ? "MOTOR RUNNING" : "idle");
+  display.setCursor(0, 52);
+  display.println("Press any button");
+  display.display();
 
   button_up.setDebounceTime(50);
   button_down.setDebounceTime(50);
   button_mode.setDebounceTime(50);
   button_start.setDebounceTime(50);
+
+  // Hold on the reset-reason screen until the user acknowledges with a button,
+  // so a reboot that happens unattended can't scroll past before it's read.
+  for (;;) {
+    button_up.loop();
+    button_down.loop();
+    button_mode.loop();
+    button_start.loop();
+    if (button_up.isPressed()    || button_up.isReleased()    ||
+        button_down.isPressed()  || button_down.isReleased()  ||
+        button_mode.isPressed()  || button_mode.isReleased()  ||
+        button_start.isPressed() || button_start.isReleased()) {
+      break;
+    }
+    delay(10);
+  }
+
+  upadteDisplay();
 
   pinMode(STEPPER_DIRECT_PIN, OUTPUT);
   pinMode(STEPPER_STEP_PIN, OUTPUT);
@@ -165,6 +219,16 @@ void savePrefs() {
   prefs.begin("agitator", false); // read-write
   prefs.putInt("timerSetTime", timerSetTime);
   prefs.putInt("strengthLevel", currentStrengthLevel);
+  prefs.end();
+}
+
+// Persist whether an agitation session is active. On the next boot setup() reads
+// this back so a power-loss reset can be correlated with motor activity: if it's
+// still 1, the board died mid-run (NVS is wiped to 0 cleanly on stepper_stop()).
+// NVS skips writes when the value is unchanged, so wear stays negligible.
+void setSessionActiveFlag(bool active) {
+  prefs.begin("agitator", false); // read-write
+  prefs.putInt("sessionOn", active ? 1 : 0);
   prefs.end();
 }
 
@@ -203,6 +267,8 @@ void beep_short() {
 void upadteDisplay() {
   char buffer [32];
   display.clearDisplay();
+  display.setTextColor(WHITE);
+  display.setTextSize(2); // main UI is size 2; set explicitly so earlier screens don't leak state
 
   if (fTimerRunning == TIMERSTATUS_STOPPED) {
     display.setCursor(0, 0);
@@ -242,10 +308,20 @@ void upadteDisplay() {
     sprintf(buffer, "%02d:%02d:%02d", hours, minutes, seconds);
     display.println(buffer);    
   }
+
+  display.setTextSize(1);
   display.setCursor(0, 40);
   sprintf(buffer, "Strength %d", currentStrengthLevel);
   display.println(buffer);
-  display.display();  
+ 
+  // Internal chip die temperature on the bottom row (small). Trend gauge only:
+  // reads the silicon temp (warmer than ambient), accuracy ~+/-2-3 C.
+  display.setTextSize(1);
+  display.setCursor(0, 56);
+  sprintf(buffer, "Chip %.1fC", temperatureRead());
+  display.println(buffer);
+
+  display.display();
 }
 
 bool fStepperRunning = false;
@@ -257,6 +333,7 @@ bool stepperInRestPhase = false;
 #define STEPPER_REST_MS 8000
 
 void stepper_start() {
+  setSessionActiveFlag(true);  // record "run active" before energizing the coils
   stepperLastRunMicros = micros();
   stepperCycleStartMillis = millis();
   stepperInRestPhase = false;
@@ -269,6 +346,7 @@ void stepper_stop() {
   fStepperRunning = false;
   stepperInRestPhase = false;
   digitalWrite(STEPPER_ENABLE_PIN, LOW);
+  setSessionActiveFlag(false);  // clean stop: clear the flag after de-energizing
 }
 
 void stepper_run() {
@@ -308,7 +386,15 @@ void stepper_run() {
 void loop() {
   bool fUpdateDisplay = false;
   unsigned long currentMillis = millis();
-  
+
+  // Refresh ~1x/sec so the chip-temperature readout updates even while idle
+  // (during a run the countdown already forces a redraw each second).
+  static unsigned long lastPeriodicRefresh = 0;
+  if (currentMillis - lastPeriodicRefresh >= 1000) {
+    lastPeriodicRefresh = currentMillis;
+    fUpdateDisplay = true;
+  }
+
   button_start.loop();
   button_down.loop();
   button_up.loop();
