@@ -57,7 +57,9 @@ unsigned long pausedMillis = 0;
 #define TIMERSTATUS_RUNNING 2
 #define TIMERSTATUS_PAUSED 1
 #define TIMERSTATUS_STOPPED 0
+#define TIMERSTATUS_DONE 3
 int fTimerRunning = TIMERSTATUS_STOPPED;
+unsigned long doneMillis = 0; // millis() when the timer finished, for the count-up on the DONE screen
 bool cancelGestureHandled = false;
 
 
@@ -268,6 +270,34 @@ void upadteDisplay() {
   char buffer [32];
   display.clearDisplay();
   display.setTextColor(WHITE);
+
+  // DONE screen: big "DONE!" plus a count-up of how long it's been since the timer finished.
+  if (fTimerRunning == TIMERSTATUS_DONE) {
+    display.setTextSize(2);
+    display.setCursor(0, 0);
+    display.println("DONE!");
+
+    display.setTextSize(1);
+    display.setCursor(0, 22);
+    display.println("since done:");
+
+    unsigned long elapsedSec = (millis() - doneMillis) / 1000UL;
+    int eh = elapsedSec / 3600;
+    int em = (elapsedSec % 3600) / 60;
+    int es = elapsedSec % 60;
+    display.setTextSize(2);
+    display.setCursor(0, 32);
+    sprintf(buffer, "+%02d:%02d:%02d", eh, em, es);
+    display.println(buffer);
+
+    display.setTextSize(1);
+    display.setCursor(0, 56);
+    display.println("START = reset");
+
+    display.display();
+    return;
+  }
+
   display.setTextSize(2); // main UI is size 2; set explicitly so earlier screens don't leak state
 
   if (fTimerRunning == TIMERSTATUS_STOPPED) {
@@ -458,6 +488,10 @@ void loop() {
       fTimerRunning = TIMERSTATUS_RUNNING;
       stepper_start();
       beep_short();
+    } else if (fTimerRunning == TIMERSTATUS_DONE) {
+      // Acknowledge the done screen and return to the setup screen
+      fTimerRunning = TIMERSTATUS_STOPPED;
+      beep_short();
     }
     fUpdateDisplay = true;
   }
@@ -555,9 +589,10 @@ void loop() {
       pausedMillis = -1;
     }
     int newTimeRemained = timerSetTime - (int)((millis() - startMillis) / 1000.0);
-    if (newTimeRemained == 0) {
-      timeCurrentRemained = newTimeRemained;
-      fTimerRunning = TIMERSTATUS_STOPPED;
+    if (newTimeRemained <= 0) {
+      timeCurrentRemained = 0;
+      fTimerRunning = TIMERSTATUS_DONE;
+      doneMillis = millis();
       stepper_stop();
       fUpdateDisplay = true;
       beep_start();
